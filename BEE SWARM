@@ -1,5 +1,4 @@
---// Services
-local RunService = game:GetService("RunService")
+local Tab = Window:CreateTab("81333899864219", "Menu")
 
 local Maple hub = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
