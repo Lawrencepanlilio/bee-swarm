@@ -1,35 +1,396 @@
-local Maple hub = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+-- Universal Rayfield Roblox Script
+-- Author: ChatGPT (template)
+-- Usage: paste into your executor. Requires an exploit that supports HttpGet/loadstring and Drawing/Highlight APIs.
+-- Rayfield source used: https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua
 
+if not game:IsLoaded() then game.Loaded:Wait() end
+
+-- Load Rayfield safely
+local success, Rayfield = pcall(function()
+    return loadstring(game:HttpGet('https://raw.githubusercontent.com/SiriusSoftwareLtd/Rayfield/main/source.lua'))()
+end)
+if not success or not Rayfield then
+    warn("Failed to load Rayfield UI. Make sure your executor allows HttpGet and the URL is reachable.")
+    return
+end
+
+-- Global settings table (persisted across scripts in same session)
+getgenv().UniversalScript = getgenv().UniversalScript or {}
+local US = getgenv().UniversalScript
+US.Config = US.Config or {
+    Keybind = Enum.KeyCode.RightControl,
+    ESPEnabled = false,
+    ESPTeamCheck = true,
+    Walkspeed = 16,
+    JumpPower = 50,
+}
+
+-- Utility helpers
+local Players = game:GetService('Players')
+local RunService = game:GetService('RunService')
+local UserInputService = game:GetService('UserInputService')
+local LocalPlayer = Players.LocalPlayer
+
+local connections = {}
+local function disconnectAll()
+    for _,c in ipairs(connections) do
+        pcall(function() c:Disconnect() end)
+    end
+    connections = {}
+end
+
+-- Create Window
 local Window = Rayfield:CreateWindow({
-   Name = "Maple hub",
-   LoadingTitle = "Welcome To Maple Hub",
-   LoadingSubtitle = "by lorenzpogi",
-   ShowText = "Menu", -- for mobile users to unhide rayfield, change if you'd like
-   Theme = "AmberGlow", -- Check https://docs.sirius.menu/rayfield/configuration/themes
-
-   DisableRayfieldPrompts = true,
-   DisableBuildWarnings = true, -- Prevents Rayfield from warning when the script has a version mismatch with the interface
-
-   ConfigurationSaving = {
-      Enabled = true,
-      FolderName = nil, -- Create a custom folder for your hub/game
-      FileName = "Big Hub"
-   },
-
-   Discord = {
-      Enabled = true, -- Prompt the user to join your Discord server if their executor supports it
-      Invite = "https://discord.gg/J2thRamQHC", -- The Discord invite code, do not include discord.gg/. E.g. discord.gg/ ABCD would be ABCD
-      RememberJoins = true -- Set this to false to make them join the discord every time they load it up
-   },
-
-   KeySystem = true, -- Set this to true to use our key system
-   KeySettings = {
-      Title = "Maple Key",
-      Subtitle = "Key System",
-      Note = "No method of obtaining the key is provided", -- Use this to tell the user how to get a key
-      FileName = "Key", -- It is recommended to use something unique as other scripts using Rayfield may overwrite your key file
-      SaveKey = true, -- The user's key will be saved, but if you change the key, they will be unable to use your script
-      GrabKeyFromSite = true, -- If this is true, set Key below to the RAW site you would like Rayfield to get the key from
-      Key = {"https://pastebin.com/raw/rKJ1kTwE"} -- List of keys that will be accepted by the system, can be RAW file links (pastebin, github etc) or simple strings ("hello","key22")
-   }
+    Name = "Universal | Rayfield Script",
+    LoadingTitle = "Universal Script",
+    LoadingSubtitle = "by ChatGPT",
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = "UniversalRayfield", -- Create a folder for configs
+        FileName = "config"
+    }
 })
+
+-- MAIN TAB: Player tweaks
+local MainTab = Window:CreateTab("Main", 4483362458) -- icon id optional
+local MovementSection = MainTab:CreateSection("Movement")
+
+-- Walkspeed
+local WalkSlider = MainTab:CreateSlider({
+    Name = "Walkspeed",
+    Range = {16, 500},
+    Increment = 1,
+    Suffix = "studs/s",
+    CurrentValue = US.Config.Walkspeed,
+    Flag = "Walkspeed"
+})
+WalkSlider:OnChanged(function(value)
+    US.Config.Walkspeed = value
+    pcall(function() LocalPlayer.Character.Humanoid.WalkSpeed = value end)
+end)
+
+-- JumpPower
+local JumpSlider = MainTab:CreateSlider({
+    Name = "JumpPower",
+    Range = {50, 300},
+    Increment = 1,
+    Suffix = "power",
+    CurrentValue = US.Config.JumpPower,
+    Flag = "JumpPower"
+})
+JumpSlider:OnChanged(function(value)
+    US.Config.JumpPower = value
+    pcall(function() LocalPlayer.Character.Humanoid.JumpPower = value end)
+end)
+
+-- Fly (basic)
+local isFlying = false
+local flySpeed = 100
+local FlyToggle = MainTab:CreateToggle({
+    Name = "Fly (Safe Mode)",
+    CurrentValue = false,
+    Flag = "FlyToggle"
+})
+FlyToggle:OnChanged(function(val)
+    isFlying = val
+    if val then
+        local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local root = character:FindFirstChild('HumanoidRootPart') or character:WaitForChild('HumanoidRootPart')
+        local bv = Instance.new('BodyVelocity')
+        bv.Name = 'UniversalFlyBV'
+        bv.MaxForce = Vector3.new(1e5,1e5,1e5)
+        bv.P = 1e4
+        bv.Velocity = Vector3.new(0,0,0)
+        bv.Parent = root
+        local connection
+        connection = RunService.RenderStepped:Connect(function()
+            if not isFlying or not root or not root.Parent then
+                pcall(function() bv:Destroy() end)
+                if connection then connection:Disconnect() end
+                return
+            end
+            local moveDir = Vector3.new(0,0,0)
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveDir = moveDir + workspace.CurrentCamera.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveDir = moveDir - workspace.CurrentCamera.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveDir = moveDir - workspace.CurrentCamera.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveDir = moveDir + workspace.CurrentCamera.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveDir = moveDir + Vector3.new(0,1,0) end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then moveDir = moveDir - Vector3.new(0,1,0) end
+            if moveDir.Magnitude > 0 then
+                bv.Velocity = moveDir.Unit * flySpeed
+            else
+                bv.Velocity = Vector3.new(0,0,0)
+            end
+        end)
+        table.insert(connections, connection)
+    else
+        -- cleanup handled in loop
+    end
+end)
+
+-- COMBAT TAB
+local CombatTab = Window:CreateTab("Combat", 4483362458)
+local CombatSection = CombatTab:CreateSection("Combat Helpers")
+
+-- Simple Aimbot (very basic ray-target selection) - use at your own discretion
+local AimToggle = CombatTab:CreateToggle({
+    Name = "Silent Aim (Server-dependent)",
+    CurrentValue = false,
+    Flag = "SilentAim"
+})
+local AimFOV = CombatTab:CreateSlider({
+    Name = "Aim FOV",
+    Range = {10, 120},
+    Increment = 1,
+    Suffix = "deg",
+    CurrentValue = 50
+})
+local AimKeybind = CombatTab:CreateBind({
+    Name = "Aim Keybind",
+    CurrentKeybind = "MouseButton2",
+    HoldToInteract = false,
+    Flag = "AimBind"
+})
+
+local function getClosestTarget(maxAngle)
+    local camera = workspace.CurrentCamera
+    local closest, closestAngle = nil, maxAngle
+    for _,plr in pairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild('HumanoidRootPart') and plr.Character:FindFirstChild('Humanoid') and plr.Character.Humanoid.Health > 0 then
+            -- team check
+            if US.Config.ESPTeamCheck and LocalPlayer.Team and plr.Team and LocalPlayer.Team == plr.Team then continue end
+            local dir = (plr.Character.HumanoidRootPart.Position - camera.CFrame.Position).Unit
+            local angle = math.deg(math.acos(math.clamp(camera.CFrame.LookVector:Dot(dir), -1, 1)))
+            if angle < closestAngle then
+                closestAngle = angle
+                closest = plr
+            end
+        end
+    end
+    return closest
+end
+
+-- Bind aim behaviour
+local aiming = false
+AimKeybind:OnChanged(function() end) -- no-op to ensure Flag exists
+UserInputService.InputBegan:Connect(function(inp, gpe)
+    if gpe then return end
+    if AimKeybind.CurrentKeybind == "MouseButton2" and inp.UserInputType == Enum.UserInputType.MouseButton2 then
+        aiming = true
+    elseif AimKeybind.CurrentKeybind ~= "MouseButton2" and inp.KeyCode.Name == AimKeybind.CurrentKeybind then
+        aiming = true
+    end
+end)
+UserInputService.InputEnded:Connect(function(inp, gpe)
+    if gpe then return end
+    if AimKeybind.CurrentKeybind == "MouseButton2" and inp.UserInputType == Enum.UserInputType.MouseButton2 then
+        aiming = false
+    elseif AimKeybind.CurrentKeybind ~= "MouseButton2" and inp.KeyCode.Name == AimKeybind.CurrentKeybind then
+        aiming = false
+    end
+end)
+
+local aimConnection = RunService.RenderStepped:Connect(function()
+    if AimToggle.Flags.SilentAim and aiming then
+        local target = getClosestTarget(AimFOV.Flags and AimFOV.Flags.CurrentValue or 50)
+        if target and target.Character and target.Character:FindFirstChild('Head') then
+            -- Attempt to set mouse hit to target head (works with some exploit environments only)
+            pcall(function()
+                local headPos = target.Character.Head.Position
+                if sethiddenproperty then
+                    -- some exploits support SetMouseLocation via hidden properties; this is exploratory and may fail
+                    pcall(function() sethiddenproperty(game:GetService('Players').LocalPlayer, 'MouseDelta', headPos) end)
+                end
+                -- Alternative: move camera to look at target briefly (safe)
+                workspace.CurrentCamera.CFrame = CFrame.new(workspace.CurrentCamera.CFrame.Position, headPos)
+            end)
+        end
+    end
+end)
+
+-- ESP TAB
+local ESPTab = Window:CreateTab("ESP", 4483362458)
+local ESPSection = ESPTab:CreateSection("Visuals")
+
+local ESPToggle = ESPTab:CreateToggle({
+    Name = "Enable ESP",
+    CurrentValue = US.Config.ESPEnabled,
+    Flag = "ESPEnabled"
+})
+ESPToggle:OnChanged(function(val)
+    US.Config.ESPEnabled = val
+    if val then
+        -- create simple Highlights for players
+        for _,p in pairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character then
+                for _,child in ipairs(p.Character:GetChildren()) do
+                    if child:IsA('BasePart') then
+                        if not child:FindFirstChild('UniversalESP') then
+                            local hl = Instance.new('Highlight')
+                            hl.Name = 'UniversalESP'
+                            hl.Adornee = p.Character
+                            hl.Parent = p.Character
+                        end
+                        break
+                    end
+                end
+            end
+        end
+        -- watch for new players
+        table.insert(connections, Players.PlayerAdded:Connect(function(p)
+            p.CharacterAdded:Connect(function(char)
+                wait(0.1)
+                if US.Config.ESPEnabled then
+                    if not char:FindFirstChild('UniversalESP') then
+                        local hl = Instance.new('Highlight')
+                        hl.Name = 'UniversalESP'
+                        hl.Adornee = char
+                        hl.Parent = char
+                    end
+                end
+            end)
+        end))
+    else
+        -- remove highlights
+        for _,p in pairs(Players:GetPlayers()) do
+            if p.Character then
+                for _,v in ipairs(p.Character:GetChildren()) do
+                    if v.Name == 'UniversalESP' and v:IsA('Highlight') then
+                        pcall(function() v:Destroy() end)
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- PLAYER TAB: Teleports, Noclip, etc.
+local PlayerTab = Window:CreateTab("Player", 4483362458)
+local PlayerSection = PlayerTab:CreateSection("Player Tools")
+
+local TeleportBox = PlayerTab:CreateTextbox({
+    Name = "Teleport to player",
+    Text = "",
+    Placeholder = "player name or display name",
+    RemoveTextAfterFocusLost = false
+})
+local TeleportButton = PlayerTab:CreateButton({
+    Name = "Teleport",
+    Callback = function()
+        local name = TeleportBox.Text
+        if not name or name == "" then return end
+        local target = nil
+        for _,p in pairs(Players:GetPlayers()) do
+            if string.find(string.lower(p.Name), string.lower(name)) or (p.DisplayName and string.find(string.lower(p.DisplayName), string.lower(name))) then
+                target = p; break
+            end
+        end
+        if target and target.Character and target.Character:FindFirstChild('HumanoidRootPart') then
+            LocalPlayer.Character:SetPrimaryPartCFrame(target.Character.HumanoidRootPart.CFrame + Vector3.new(0,3,0))
+        else
+            Rayfield:Notify({Title = "Teleport", Content = "Player not found or has no character", Duration = 4})
+        end
+    end
+})
+
+local NoclipToggle = PlayerTab:CreateToggle({Name = "Noclip", CurrentValue = false, Flag = "Noclip"})
+NoclipToggle:OnChanged(function(val)
+    if val then
+        local conn = RunService.Stepped:Connect(function()
+            if LocalPlayer.Character then
+                for _,part in ipairs(LocalPlayer.Character:GetDescendants()) do
+                    if part:IsA('BasePart') and part.CanCollide then
+                        part.CanCollide = false
+                    end
+                end
+            end
+        end)
+        table.insert(connections, conn)
+    else
+        -- re-enable collisions
+        pcall(function()
+            if LocalPlayer.Character then
+                for _,part in ipairs(LocalPlayer.Character:GetDescendants()) do
+                    if part:IsA('BasePart') then
+                        part.CanCollide = true
+                    end
+                end
+            end
+        end)
+    end
+end)
+
+-- WORLD TAB: environment controls (if accessible in game)
+local WorldTab = Window:CreateTab("World", 4483362458)
+local WorldSection = WorldTab:CreateSection("World Controls")
+
+local TimeSlider = WorldTab:CreateSlider({Name = "Time of Day", Range = {0, 24}, Increment = 0.5, Suffix = "hours", CurrentValue = tonumber(string.format("%.1f", game.Lighting and game.Lighting.ClockTime or 12))})
+TimeSlider:OnChanged(function(val)
+    pcall(function() game:GetService('Lighting').ClockTime = val end)
+end)
+
+local BrightnessSlider = WorldTab:CreateSlider({Name = "Brightness", Range = {0, 10}, Increment = 0.1, Suffix = "", CurrentValue = tonumber(string.format("%.1f", game.Lighting and game.Lighting.Brightness or 2))})
+BrightnessSlider:OnChanged(function(val)
+    pcall(function() game:GetService('Lighting').Brightness = val end)
+end)
+
+-- MISC TAB: server hop, rejoin
+local MiscTab = Window:CreateTab("Misc", 4483362458)
+local MiscSection = MiscTab:CreateSection("Utilities")
+
+MiscTab:CreateButton({Name = "Rejoin", Callback = function()
+    local PlaceId = game.PlaceId
+    local JobId = game.JobId
+    if syn and syn.queue_on_teleport then
+        syn.queue_on_teleport(string.format([[loadstring(game:HttpGet('%s'))()]], 'https://pastebin.com/raw/REPLACE_WITH_YOUR_SCRIPT'))
+    end
+    game:GetService('TeleportService'):Teleport(PlaceId, LocalPlayer)
+end})
+
+MiscTab:CreateButton({Name = "Server Hop (basic)", Callback = function()
+    -- Basic server hop using Roblox API (may be limited on some executors)
+    local http = (syn and syn.request) or (http and http.request) or (fluxus and fluxus.request) or request
+    if not http then Rayfield:Notify({Title="Server Hop", Content="HTTP request unavailable in your executor.", Duration=4}) return end
+    local placeId = game.PlaceId
+    local url = "https://games.roblox.com/v1/games/"..placeId.."/servers/Public?sortOrder=Asc&limit=100"
+    local ok, res = pcall(function() return http({Url = url, Method = 'GET'}) end)
+    if not ok or not res or not res.Body then Rayfield:Notify({Title="Server Hop", Content="Failed to query servers", Duration=4}) return end
+    local body = res.Body
+    local data = nil
+    pcall(function() data = game:GetService('HttpService'):JSONDecode(body) end)
+    if not data or not data.data then Rayfield:Notify({Title="Server Hop", Content="No servers found", Duration=4}) return end
+    local servers = {}
+    for _,v in ipairs(data.data) do
+        if tonumber(v.playing) < tonumber(game.MaxPlayers) then
+            table.insert(servers, v.id)
+        end
+    end
+    if #servers == 0 then Rayfield:Notify({Title="Server Hop", Content="No suitable servers", Duration=4}) return end
+    local serverId = servers[math.random(1,#servers)]
+    game:GetService('TeleportService'):TeleportToPlaceInstance(placeId, serverId, LocalPlayer)
+end})
+
+-- SETTINGS TAB
+local SettingsTab = Window:CreateTab("Settings", 4483362458)
+local SettingsSection = SettingsTab:CreateSection("General")
+
+SettingsTab:CreateBind({Name = "Toggle UI Keybind", CurrentKeybind = "RightControl", HoldToInteract = false, Flag = "ToggleUI"}):OnChanged(function() end)
+
+-- Add a notification example
+Window:Notify({Title = "Universal UI", Content = "Loaded successfully. Use the tabs to configure features.", Duration = 6})
+
+-- Cleanup on unload
+game:BindToClose(function()
+    disconnectAll()
+end)
+
+-- Attempt to apply initial walk/jump values
+pcall(function()
+    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild('Humanoid') then
+        LocalPlayer.Character.Humanoid.WalkSpeed = US.Config.Walkspeed
+        LocalPlayer.Character.Humanoid.JumpPower = US.Config.JumpPower
+    end
+end)
+
+-- Final message in logs
+print("Universal Rayfield Script loaded. Open the UI with the configured keybind.")
