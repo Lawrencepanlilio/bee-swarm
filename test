@@ -1,5 +1,5 @@
 --// Load the UI Library
-local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Lawrencepanlilio/bee-swarm/refs/heads/main/BEE%20SWARM"))()
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Lawrencepanlilio/bee-swarm/refs/heads/main/bee%20swarm%20function"))()
 
 --// Create Window
 local Lib = Library.CreateLibrary("MAPLEPRO", "Maple Hub")
