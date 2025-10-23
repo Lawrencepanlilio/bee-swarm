@@ -8,9 +8,6 @@ local icon = Library.CreateFloatingIcon(Lib._mainFrame, "rbxassetid://1251615625
 
 --// Tabs
 local Tab1 = Lib:AddTab("Home","rbxassetid://77479668856839")
-local Tab2 = Lib:AddTab("Main","rbxassetid://99517913979491")
-local Tab3 = Lib:AddTab("Storage","rbxassetid://95872264727664")
-local Tab4 = Lib:AddTab("Others","rbxassetid://78943179033589")
 ---------------------------------------------------
 --// Services
 local RunService = game:GetService("RunService")
