@@ -1,46 +1,101 @@
-   = = check game
-   if game.PlaceId = = 1537690962 then
-     local CurrentVersion = "Maple Hub - Bee Swarm Simulator"
-     
-     -- Call the library
-     local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-     
-local Window = Rayfield:CreateWindow({
-   Name = "Maple Hub",
-   Icon = 81333899864219, -- Icon in Topbar. Can use Lucide Icons (string) or Roblox Image (number). 0 to use no icon (default).
-   LoadingTitle = "Maple Hub",
-   LoadingSubtitle = "by Lorenz",
-   ShowText = "Maple Hub", -- for mobile users to unhide rayfield, change if you'd like
-   Theme = "AmberGlow", -- Check https://docs.sirius.menu/rayfield/configuration/themes
+--// Bee Swarm Simulator - ServerScriptService Script
+--// Author: You
 
-   ToggleUIKeybind = "K", -- The keybind to toggle the UI visibility (string like "K" or Enum.KeyCode)
+-- Services
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local ServerStorage = game:GetService("ServerStorage")
 
-   DisableRayfieldPrompts = false,
-   DisableBuildWarnings = false, -- Prevents Rayfield from warning when the script has a version mismatch with the interface
+-- Remotes
+local RemotesFolder = ReplicatedStorage:WaitForChild("Remotes")
+local CollectHoneyEvent = RemotesFolder:WaitForChild("CollectHoney")
+local SpawnBeeEvent = RemotesFolder:WaitForChild("SpawnBee")
+local ConvertPollenEvent = RemotesFolder:WaitForChild("ConvertPollen")
 
-   ConfigurationSaving = {
-      Enabled = true,
-      FolderName = nil, -- Create a custom folder for your hub/game
-      FileName = "Big Hub"
-   },
+-- Settings
+local CONVERT_RATE = 0.5 -- how much pollen turns into honey per tick
+local CONVERT_INTERVAL = 0.5 -- seconds between conversions
 
-   Discord = {
-      Enabled = false, -- Prompt the user to join your Discord server if their executor supports it
-      Invite = "noinvitelink", -- The Discord invite code, do not include discord.gg/. E.g. discord.gg/ ABCD would be ABCD
-      RememberJoins = true -- Set this to false to make them join the discord every time they load it up
-   },
+------------------------------------------------------
+-- Helper functions
+------------------------------------------------------
 
-   KeySystem = false, -- Set this to true to use our key system
-   KeySettings = {
-      Title = "Untitled",
-      Subtitle = "Key System",
-      Note = "No method of obtaining the key is provided", -- Use this to tell the user how to get a key
-      FileName = "Key", -- It is recommended to use something unique as other scripts using Rayfield may overwrite your key file
-      SaveKey = true, -- The user's key will be saved, but if you change the key, they will be unable to use your script
-      GrabKeyFromSite = false, -- If this is true, set Key below to the RAW site you would like Rayfield to get the key from
-      Key = {"Hello"} -- List of keys that will be accepted by the system, can be RAW file links (pastebin, github etc) or simple strings ("hello","key22")
-   }
-})
-   
-   
-  end
+-- Create leaderstats for player if not already present
+local function setupLeaderstats(player)
+	local stats = player:FindFirstChild("leaderstats")
+	if not stats then
+		stats = Instance.new("Folder")
+		stats.Name = "leaderstats"
+		stats.Parent = player
+	end
+
+	local honey = stats:FindFirstChild("Honey") or Instance.new("IntValue")
+	honey.Name = "Honey"
+	honey.Value = honey.Value or 0
+	honey.Parent = stats
+
+	local pollen = stats:FindFirstChild("Pollen") or Instance.new("IntValue")
+	pollen.Name = "Pollen"
+	pollen.Value = pollen.Value or 0
+	pollen.Parent = stats
+end
+
+-- When player joins, setup stats
+Players.PlayerAdded:Connect(setupLeaderstats)
+
+------------------------------------------------------
+-- RemoteEvent: CollectHoney
+------------------------------------------------------
+CollectHoneyEvent.OnServerEvent:Connect(function(player, amount)
+	if typeof(amount) ~= "number" then return end
+
+	local stats = player:FindFirstChild("leaderstats")
+	if not stats then return end
+
+	local honey = stats:FindFirstChild("Honey")
+	if honey then
+		honey.Value += math.floor(amount)
+	end
+end)
+
+------------------------------------------------------
+-- RemoteEvent: SpawnBee
+------------------------------------------------------
+SpawnBeeEvent.OnServerEvent:Connect(function(player)
+	-- Check for a bee model in ServerStorage
+	local beeModel = ServerStorage:FindFirstChild("Bee")
+	if not beeModel then
+		warn("No bee model found in ServerStorage!")
+		return
+	end
+
+	-- Clone and parent to workspace
+	local newBee = beeModel:Clone()
+	newBee.Name = player.Name .. "_Bee"
+	newBee.Parent = workspace
+
+	-- Optionally set a spawn position
+	newBee:MoveTo(player.Character and player.Character:GetPrimaryPartCFrame().p + Vector3.new(5, 0, 0) or Vector3.zero)
+end)
+
+------------------------------------------------------
+-- RemoteEvent: ConvertPollen
+------------------------------------------------------
+ConvertPollenEvent.OnServerEvent:Connect(function(player)
+	local stats = player:FindFirstChild("leaderstats")
+	if not stats then return end
+
+	local honey = stats:FindFirstChild("Honey")
+	local pollen = stats:FindFirstChild("Pollen")
+	if not honey or not pollen then return end
+
+	-- Convert pollen gradually into honey
+	task.spawn(function()
+		while pollen.Value > 0 do
+			local convertAmount = math.min(pollen.Value, math.ceil(CONVERT_RATE * 10))
+			pollen.Value -= convertAmount
+			honey.Value += convertAmount
+			task.wait(CONVERT_INTERVAL)
+		end
+	end)
+end)
