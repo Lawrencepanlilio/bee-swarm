@@ -2,7 +2,7 @@
 local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Lawrencepanlilio/bee-swarm/refs/heads/main/BEE%20SWARM"))()
 
 --// Create Window
-local Lib = Library.CreateLibrary("MEMBROTS", "Plants vs Brainrots")
+local Lib = Library.CreateLibrary("MAPLEPRO", "Bee Swarm Simulator")
 
 local icon = Library.CreateFloatingIcon(Lib._mainFrame, "rbxassetid://125161562555332", 48)
 
