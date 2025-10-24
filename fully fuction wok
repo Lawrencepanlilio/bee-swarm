@@ -1,0 +1,45 @@
+--// Load the UI Library
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/Lawrencepanlilio/bee-swarm/refs/heads/main/BEE%20SWARM"))()
+
+--// Create Window
+local Lib = Library.CreateLibrary("MAPLEPRO", "Bee Swarm Simulator")
+
+local icon = Library.CreateFloatingIcon(Lib._mainFrame, "rbxassetid://125161562555332", 48)
+
+--// Tabs
+local Tab1 = Lib:AddTab("Home","rbxassetid://77479668856839")
+local Tab2 = Lib:AddTab("Main","rbxassetid://99517913979491")
+local Tab3 = Lib:AddTab("Storage","rbxassetid://95872264727664")
+local Tab4 = Lib:AddTab("Others","rbxassetid://78943179033589")
+---------------------------------------------------
+--// Services
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+--// Remotes
+--// Toggle setup
+local AutoToggle = Tab1:AddToggle("Enable AutoFarm", false, function(v)
+    getgenv().AutoFarm = v
+end)
+
+--// Services
+local player = game:GetService("Players").LocalPlayer
+local replicatedStorage = game:GetService("ReplicatedStorage")
+local toolEvent = replicatedStorage:WaitForChild("Events"):WaitForChild("ToolCollect")
+
+--// Settings
+local CHECK_INTERVAL = 1
+
+--// Auto Tool Collect Loop
+task.spawn(function()
+    while task.wait(CHECK_INTERVAL) do
+        if getgenv().AutoFarm then
+            for _, tool in pairs(workspace:GetDescendants()) do
+                if tool:IsA("Tool") and tool:FindFirstChild("Handle") then
+                    -- Fire the remote to collect it
+                    toolEvent:FireServer(tool)
+                end
+            end
+        end
+    end
+end)
